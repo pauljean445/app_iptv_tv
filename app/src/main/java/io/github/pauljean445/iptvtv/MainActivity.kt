@@ -36,7 +36,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null && model.screen == Screen.Loading) model.start()
+        // Démarrage une seule fois par modèle : aussi quand Android recrée l'appli qu'il avait fermée en arrière-plan
+        // (ex. après l'autorisation « installer des applis inconnues »), sinon elle resterait sur « Démarrage… »
+        model.startOnce()
         setContent { IptvTheme { App(model) { finish() } } }
     }
 

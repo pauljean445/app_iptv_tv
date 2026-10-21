@@ -7,6 +7,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Version : une seule ligne dans version.properties (comme __init__.py de l'appli PC). Le numéro interne exigé par
+// Android (versionCode, toujours croissant) en est déduit : 1.2.3 -> 10203.
+val appVersion: String = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
+    .getProperty("version").trim()
+val appVersionCode: Int = appVersion.split(".").map { it.toInt() }.let { (major, minor, patch) ->
+    major * 10000 + minor * 100 + patch
+}
+
 // Clé de signature des versions publiées : hors du dépôt (voir README, « Clé de signature »)
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
@@ -21,9 +29,8 @@ android {
         applicationId = "io.github.pauljean445.iptvtv"
         minSdk = 26
         targetSdk = 35
-        // Version : à augmenter avant chaque publication (l'appli s'en sert pour proposer les mises à jour)
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = appVersionCode  // version.properties
+        versionName = appVersion
         // Lecteur VLC embarqué en ARM 32 bits seulement : c'est le processeur de la Bravia, et les TV / boîtiers
         // 64 bits lancent aussi les applis 32 bits. APK deux fois plus léger qu'avec les deux versions.
         ndk { abiFilters += listOf("armeabi-v7a") }

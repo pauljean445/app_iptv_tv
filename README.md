@@ -8,9 +8,10 @@ Kotlin + Jetpack Compose for TV (interface à la télécommande) + libVLC (lectu
 ## Organisation du projet
 ```
 app_iptv_tv/
+├─ version.properties       version de l'appli (une ligne, comme __init__.py côté PC)
 ├─ build_release.bat        créer l'APK publié dist\IPTVPlayerTV-<version>.apk (signé)
 ├─ keystore.properties      mots de passe de la clé de signature (HORS dépôt, voir plus bas)
-├─ app/build.gradle.kts     versions (versionCode / versionName), dépendances, signature
+├─ app/build.gradle.kts     dépendances, signature (lit version.properties)
 └─ app/src/main/java/io/github/pauljean445/iptvtv/
    ├─ MainActivity.kt       écrans (pile, touche Retour), mise à jour proposée, messages
    ├─ AppModel.kt           état de l'appli : compte, profils, catalogue, favoris, synchro toutes les 30 s
@@ -41,11 +42,11 @@ plateforme 35, build-tools, platform-tools pour `adb`). Variables d'utilisateur 
   des applis (sans perte de comptes ni de réglages).
 
 ## Publier une version (mise à jour proposée dans l'appli)
-1. augmenter `versionCode` (+1) **et** `versionName` (ex. `0.3.0`) dans `app/build.gradle.kts` ;
-   le lanceur Google TV garde aussi l'icône en cache par `versionCode` ;
-2. lancer `build_release.bat` → `dist\IPTVPlayerTV-0.3.0.apk` ;
-3. sur GitHub : *Releases* > *Draft a new release*, tag `v0.3.0`, joindre l'APK, décrire les nouveautés (affichées
-   dans l'appli), *Publish release*.
+1. augmenter la version dans `version.properties` (ex. `version=1.0.2`) : le numéro interne d'Android
+   (`versionCode`) en est déduit (1.0.2 → 10002), toujours croissant ;
+2. double-cliquer sur `build_release.bat` → `dist\IPTVPlayerTV-1.0.2.apk` ;
+3. commiter / pousser, puis sur GitHub : *Releases* > *Draft a new release*, tag `v1.0.2`, joindre l'APK, décrire les
+   nouveautés (affichées dans l'appli), *Publish release*.
 
 Le dépôt GitHub `pauljean445/app_iptv_tv` doit être **public** (constante `REPO` dans `update/Updater.kt`).
 L'appli cherche une nouvelle version 8 s après son ouverture (et via Réglages → « Rechercher une mise à jour ») ;

@@ -161,6 +161,15 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     fun libraryChanged() { libVersion++ }
 
     // ---- Démarrage ----------------------------------------------------------------------- //
+    private var launched = false
+
+    /** Premier démarrage de ce modèle (les recréations de l'écran, elles, gardent l'état en cours). */
+    fun startOnce() {
+        if (launched) return
+        launched = true
+        start()
+    }
+
     fun start(notice: String = "") {
         if (!updateChecked) {  // une fois par lancement, 8 s après l'ouverture (comme sur PC)
             updateChecked = true
