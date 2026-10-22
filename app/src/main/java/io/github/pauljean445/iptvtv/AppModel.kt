@@ -142,7 +142,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 }
                 updateProgress = 1f
                 if (::library.isInitialized) { library.save(); withContext(Dispatchers.IO) { pushNow() } }
-                withContext(Dispatchers.IO) { Updater.install(context.applicationContext, apk) }
+                Updater.install(context.applicationContext, apk)  // ouvre l'installeur d'Android
             } catch (e: Updater.Cancelled) {
                 updateProgress = -1f
             } catch (e: Exception) {

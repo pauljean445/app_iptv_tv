@@ -29,14 +29,14 @@ import io.github.pauljean445.iptvtv.ui.C
 import io.github.pauljean445.iptvtv.ui.Card
 import io.github.pauljean445.iptvtv.ui.ProgressBar
 
-/** « Mise à jour disponible » : nouveautés, téléchargement (avec progression), puis installeur d'Android. */
+/** « Mise à jour disponible » : nouveautés, téléchargement (avec progression), puis installeur d'Android. */
 @Composable
 fun UpdateDialog(model: AppModel) {
     val info = model.update ?: return
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
     val progress = model.updateProgress
-    // Autorisation « installer des applis inconnues » : revérifiée à chaque retour dans l'appli (réglage d'Android)
+    // Autorisation « installer des applis inconnues » : revérifiée à chaque retour dans l'appli (réglage d'Android)
     var allowed by remember { mutableStateOf(Updater.canInstall(context)) }
     LifecycleResumeEffect(Unit) {
         allowed = Updater.canInstall(context)
@@ -48,14 +48,15 @@ fun UpdateDialog(model: AppModel) {
             modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()))
         when {
             progress >= 0f -> {
-                Text(if (progress < 1f) "Téléchargement… ${(progress * 100).toInt()} %" else "Ouverture de l'installeur…",
+                Text(if (progress < 1f) "Téléchargement… ${(progress * 100).toInt()} %"
+                    else "Installation… À la fin, choisis « Ouvrir » pour relancer l'appli.",
                     color = C.text, fontSize = 15.sp)
                 ProgressBar(progress)
             }
             model.updateError.isNotEmpty() -> Text(model.updateError, color = C.live, fontSize = 15.sp)
             !allowed -> Text("Une seule fois : autorise IPTV Player à installer ses mises à jour " +
-                "(« Autoriser » ouvre le réglage d'Android ; active-le puis reviens avec Retour).", color = C.accentHi, fontSize = 15.sp)
-            else -> Text("L'appli va se fermer le temps de l'installation. Tes profils, favoris et reprises sont conservés.",
+                "(« Autoriser » ouvre le réglage d'Android ; active-le puis reviens avec Retour).", color = C.accentHi, fontSize = 15.sp)
+            else -> Text("L'appli se ferme le temps de l'installation ; à la fin, « Ouvrir » la relance. Tes profils, favoris et reprises sont conservés.",
                 color = C.muted, fontSize = 14.sp)
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)) {

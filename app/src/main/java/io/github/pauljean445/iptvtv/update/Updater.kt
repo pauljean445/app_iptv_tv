@@ -1,14 +1,13 @@
 package io.github.pauljean445.iptvtv.update
 
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.os.StatFs
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.github.pauljean445.iptvtv.BuildConfig
 import io.github.pauljean445.iptvtv.data.JSON
 import io.github.pauljean445.iptvtv.data.asObj
@@ -106,33 +105,51 @@ object Updater {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    /** Confie l'APK à l'installeur d'Android, qui demande confirmation ; l'appli est fermée pendant la mise à jour. */
+    private fun prefs(context: Context) = context.getSharedPreferences("update", Context.MODE_PRIVATE)
+
+    /** Mise à jour lancée depuis l'appli : la nouvelle version affichera « à jour » (pas après un « adb install »). */
+    private fun markPending(context: Context) {
+        prefs(context).edit().putLong("pending", System.currentTimeMillis()).commit()
+    }
+
+    /** Appelé par la nouvelle version : vrai si la mise à jour venait de l'appli (marque de moins de 30 min, ou
+     *  installée par l'appli elle-même selon Android : marche aussi depuis une version qui ne posait pas la marque).
+     *  Note aussi « à afficher : mise à jour installée » pour le prochain démarrage. */
+    fun takePending(context: Context): Boolean {
+        val p = prefs(context)
+        val t = p.getLong("pending", 0L)
+        val bySelf = Build.VERSION.SDK_INT >= 30 && try {
+            context.packageManager.getInstallSourceInfo(context.packageName).initiatingPackageName == context.packageName
+        } catch (e: Exception) { false }
+        val ours = (t > 0 && System.currentTimeMillis() - t < 30 * 60_000L) || bySelf
+        p.edit().remove("pending").putBoolean("just_updated", ours).commit()
+        return ours
+    }
+
+    /** Vrai une seule fois après une mise à jour faite depuis l'appli (message « IPTV Player est à jour »). */
+    fun takeJustUpdated(context: Context): Boolean {
+        val p = prefs(context)
+        return p.getBoolean("just_updated", false).also { if (it) p.edit().remove("just_updated").commit() }
+    }
+
+    /** Confie l'APK à l'installeur d'Android : confirmation, installation (l'appli est fermée), puis écran
+     *  « Application installée » avec un bouton « Ouvrir ». Android interdit à une appli de se rouvrir toute seule
+     *  après sa mise à jour (lancement depuis l'arrière-plan bloqué, vérifié sur la Sony) : ce bouton la relance. */
     fun install(context: Context, apk: File) {
-        val installer = context.packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-            .apply { setAppPackageName(context.packageName); setSize(apk.length()) }
-        val id = installer.createSession(params)
-        installer.openSession(id).use { session ->
-            session.openWrite("update.apk", 0, apk.length()).use { out ->
-                apk.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
-            }
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
-            val intent = PendingIntent.getBroadcast(context, id,
-                Intent(context, InstallReceiver::class.java).setPackage(context.packageName), flags)
-            session.commit(intent.intentSender)
-        }
+        markPending(context)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.update", apk)
+        @Suppress("DEPRECATION")  // ACTION_INSTALL_PACKAGE : l'installeur standard, avec son écran de fin
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 }
 
-/** Résultat de l'installation : Android demande la confirmation de l'utilisateur, qu'on affiche. */
-class InstallReceiver : BroadcastReceiver() {
+/** Nouvelle version installée (Android l'envoie à la nouvelle version, l'ancienne a été fermée) : si la mise à jour
+ *  venait de l'appli, le prochain démarrage affiche « IPTV Player est à jour ». (Rouvrir l'appli d'ici est bloqué
+ *  par Android : c'est le bouton « Ouvrir » de l'installeur qui la relance.) */
+class UpdatedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -999) == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            @Suppress("DEPRECATION")
-            val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-            context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) Updater.takePending(context)
     }
 }

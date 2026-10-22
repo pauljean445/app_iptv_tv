@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.material.icons.Icons
@@ -186,6 +187,7 @@ fun HomeContent(model: AppModel) {
 }
 
 /** Une bande de l'accueil (aussi utilisée par la recherche). */
+@OptIn(ExperimentalComposeUiApi::class)  // FocusRequester.Cancel : bouts de bande
 @Composable
 internal fun HomeRow(title: String, sub: String, items: List<Item>, poster: Boolean, empty: String,
                     subtitle: (Item) -> String, progress: (Item) -> Float, onClick: (Item) -> Unit,
@@ -201,9 +203,13 @@ internal fun HomeRow(title: String, sub: String, items: List<Item>, poster: Bool
         } else {
             LazyRow(contentPadding = PaddingValues(vertical = 12.dp, horizontal = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                items(items, key = { it.key }) { it ->
+                itemsIndexed(items, key = { _, it -> it.key }) { i, it ->
                     Tile(it, subtitle(it), poster, progress(it), onClick = { onClick(it) }, onLongClick = { onLongClick(it) },
-                        modifier = Modifier.restoreFocus(model, it.key))
+                        modifier = Modifier.restoreFocus(model, it.key).focusProperties {
+                            // Bout de la bande : la flèche ne fait rien (au lieu de sauter sur ☰ ou un onglet)
+                            if (i == 0) left = FocusRequester.Cancel
+                            if (i == items.lastIndex) right = FocusRequester.Cancel
+                        })
                 }
             }
         }

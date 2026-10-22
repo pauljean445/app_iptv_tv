@@ -34,7 +34,21 @@
             </intent-filter>
         </activity>
 
-        <!-- Mise à jour : résultat de l'installeur d'Android (confirmation à afficher) -->
-        <receiver android:name=".update.InstallReceiver" android:exported="false" />
+        <!-- Mise à jour : l'APK téléchargé est lu par l'installeur d'Android (lien temporaire, lecture seule) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
+        <!-- Mise à jour installée (envoyé par Android à la nouvelle version) : message « à jour » au démarrage -->
+        <receiver android:name=".update.UpdatedReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

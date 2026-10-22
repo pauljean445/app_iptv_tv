@@ -52,7 +52,10 @@ Le dépôt GitHub `pauljean445/app_iptv_tv` doit être **public** (constante `RE
 L'appli cherche une nouvelle version 8 s après son ouverture (et via Réglages → « Rechercher une mise à jour ») ;
 la fenêtre n'apparaît jamais pendant une lecture. Elle télécharge l'APK (après avoir vérifié la place libre) et le
 confie à l'installeur d'Android. La première fois, Android demande d'autoriser l'appli à « installer des applis
-inconnues » (bouton « Autoriser » de la fenêtre).
+inconnues » (bouton « Autoriser » de la fenêtre). Depuis la 1.0.4, l'APK est confié à l'installeur standard
+d'Android (`ACTION_INSTALL_PACKAGE` + `FileProvider`) : confirmation, installation, puis « Application installée »
+avec le bouton **Ouvrir** (sélectionné) qui relance l'appli ; elle affiche alors « IPTV Player est à jour : version … ».
+Android interdit à une appli de se rouvrir seule après sa mise à jour (vérifié sur la Sony).
 
 ## Clé de signature (à sauvegarder !)
 L'APK publié est signé par `%USERPROFILE%\.android-keys\iptvtv-release.jks` (alias `iptvtv`), dont les mots de passe
