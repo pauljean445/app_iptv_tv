@@ -157,6 +157,7 @@ fun DetailsScreen(model: AppModel, item: Item) {
 @Composable
 private fun EpisodeRow(model: AppModel, ep: Item, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
     val lib = model.library
+    @Suppress("UNUSED_VARIABLE") val v = model.libVersion  // redessinée à chaque changement (vu, reprise)
     val pos = lib.resumePosition(ep.key)
     val len = lib.length(ep.key)
     FocusCard(onClick = onClick, onLongClick = onLongClick, modifier = modifier.fillMaxWidth().height(76.dp), radius = 10.dp) {
