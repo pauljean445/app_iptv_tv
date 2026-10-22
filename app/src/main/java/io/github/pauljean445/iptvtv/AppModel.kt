@@ -420,10 +420,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             if (changed) libraryChanged()
             writes += libWrites
             val (srcChanged, srcFields) = withContext(Dispatchers.IO) { Sync.sourceWrites(store, pid, doc, cloud.vaultKey) }
-            val all = Sync.withFields(writes, pid, srcFields)
-            writes.clear(); writes += all
+            // Copie : sans champ à ajouter, withFields rend la liste telle quelle (la vider ici effaçait les envois)
+            val all = Sync.withFields(writes.toList(), pid, srcFields)
             if (srcChanged) { toast = "Abonnement IPTV mis à jour depuis un autre appareil"; loadCatalog(force = true) }
-            if (writes.isNotEmpty()) withContext(Dispatchers.IO) { cloud.commit(writes) }
+            if (all.isNotEmpty()) withContext(Dispatchers.IO) { cloud.commit(all) }
         } catch (e: Cloud.AuthError) {
             sessionLost(e.message ?: "session expirée")
         } catch (e: Cloud.Forbidden) {

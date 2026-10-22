@@ -75,6 +75,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 
 private val RESUMABLE = setOf("movie", "episode")
 private const val MAX_RETRIES = 5
+private const val EARLY_END_MS = 120_000L
 
 /**
  * Lecteur (VLC, comme sur PC). Télécommande, quand les commandes sont masquées :
@@ -179,6 +180,11 @@ fun PlayerScreen(model: AppModel, start: Item, list: List<Item>, resume: Boolean
                 MediaPlayer.Event.Buffering -> buffering = ev.buffering < 100f
                 MediaPlayer.Event.ESAdded, MediaPlayer.Event.ESSelected -> applyPrefs()
                 MediaPlayer.Event.EndReached -> {
+                    // Fin bien avant la fin réelle : flux coupé par le fournisseur (ex. connexions simultanées
+                    // dépassées), pas la fin du film / de l'épisode -> reconnexion à la position atteinte
+                    if (current.kind in RESUMABLE && len > 0 && pos < len - EARLY_END_MS && retries < MAX_RETRIES) {
+                        retries++; play(current, pos); return@setEventListener
+                    }
                     if (current.kind in RESUMABLE) { pos = maxOf(pos, len); save(finished = true) }
                     if (nextItem() != null) nextCountdown = 5 else onExit()
                 }
