@@ -89,30 +89,30 @@ object Sync {
     // ---- Source IPTV du profil (chiffrée) --------------------------------------------- //
     val VAULT_KEYS = listOf("mode", "server", "username", "password", "stream_format", "url")
 
-    /** Source IPTV du profil : celle du serveur si elle est plus récente (déchiffrée dans profile.json),
-     *  sinon celle d'ici, chiffrée, si elle est plus récente. Retourne (source d'ici modifiée, champs à écrire).
-     *  Source du serveur indéchiffrable (mot de passe changé depuis) : remplacée par celle d'ici. */
+    /** Source IPTV du profil (même règle que sync.source_writes côté PC). Le compte sert à configurer les appareils
+     *  qui n'en ont pas : un profil SANS abonnement sur cet appareil prend celui du compte (déchiffré dans
+     *  profile.json). Un profil qui en a un le garde toujours (chaque appareil peut avoir le sien, ex. un lien « TV »
+     *  différent de celui du PC) ; il l'envoie au compte s'il n'y en a pas, s'il y est indéchiffrable (mot de passe
+     *  changé) ou après un changement fait ici (source_t plus récent). Retourne (source d'ici modifiée, champs à écrire). */
     fun sourceWrites(store: Store, pid: String, remote: Obj?, key: ByteArray?): Pair<Boolean, Map<String, Any?>> {
         key ?: return false to emptyMap()
         val own = store.readProfile(pid)
         val lt = own["source_t"].num()
         val r = remote?.get("secret").asObj()?.get("source").asObj()
-        val rt = r?.get("t").num() ?: -1.0
-        val path = fieldPath("secret", "source")
-        if (r != null && rt > lt) {
-            val data = Vault.decrypt(key, pid, r["v"].str())
-            if (data != null) {
-                VAULT_KEYS.forEach { k -> own[k] = data[k] }
-                own["remember"] = true
-                own["source_t"] = rt
-                store.writeProfile(pid, own)
-                return true to emptyMap()
-            }
+        val rt = r?.get("t").num() ?: 0.0
+        val data = r?.let { Vault.decrypt(key, pid, it["v"].str()) }
+        if (Source.fromProfile(own) == null) {
+            data ?: return false to emptyMap()
+            VAULT_KEYS.forEach { k -> own[k] = data[k] }
+            own["remember"] = true
+            own["source_t"] = rt
+            store.writeProfile(pid, own)
+            return true to emptyMap()
         }
-        val readable = r != null && Vault.decrypt(key, pid, r["v"].str()) != null
-        if (Source.fromProfile(own) != null && (r == null || lt > rt || !readable)) {
+        if (r == null || data == null || lt > rt) {
             val t = if (r == null || lt > rt) lt else now()
             if (t != lt) { own["source_t"] = t; store.writeProfile(pid, own) }
+            val path = fieldPath("secret", "source")
             return false to mapOf(path to mapOf("v" to Vault.encrypt(key, pid, VAULT_KEYS.associateWith { own[it] }), "t" to t))
         }
         return false to emptyMap()

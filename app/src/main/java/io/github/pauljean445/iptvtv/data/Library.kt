@@ -148,13 +148,15 @@ class Library(val folder: File) {
 
     fun setUnwatched(episode: Item) { drop("watched", episode.key); save() }
 
-    /** Enregistre l'avancement d'un film ou d'un épisode. */
+    /** Enregistre l'avancement d'un film ou d'un épisode. Dès que l'image a démarré (pos > 0), le film / la série
+     *  entre dans « Vu récemment » ; la position de reprise n'est gardée qu'à partir de MIN_RESUME_MS (comme le PC). */
     fun update(item: Item, pos: Long, length: Long, finished: Boolean) {
+        if (!finished && pos <= 0) return
         if (item.kind == "movie") {
             if (finished) {
                 drop("progress", item.key); drop("recent", item.key)
-            } else if (pos >= MIN_RESUME_MS) {
-                put("progress", item.key, mutableMapOf("pos" to pos, "len" to length))
+            } else {
+                if (pos >= MIN_RESUME_MS) put("progress", item.key, mutableMapOf("pos" to pos, "len" to length))
                 put("recent", item.key, mutableMapOf("kind" to "movie", "name" to item.name))
             }
             return
@@ -166,7 +168,7 @@ class Library(val folder: File) {
             if (item.key !in watched) put("watched", item.key, mutableMapOf("s" to show.key))
         } else if (pos >= MIN_RESUME_MS) {
             put("progress", item.key, mutableMapOf("pos" to pos, "len" to length))
-        } else if (show.key !in recent) return
+        }
         val label = if (item.season > 0 || item.episode > 0) "S%02dE%02d".format(item.season, item.episode) else item.name
         val entry: Obj = LinkedHashMap(recent[show.key].asObj() ?: mutableMapOf("kind" to "series"))
         entry["last_ep"] = item.key; entry["last_label"] = label; entry["name"] = show.name

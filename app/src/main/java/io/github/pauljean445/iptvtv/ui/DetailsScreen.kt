@@ -190,6 +190,7 @@ fun seriesTarget(model: AppModel, show: Item): Item? {
     if (idx < 0) return eps.first()
     if (lib.resumePosition(last) > 0) return eps[idx]
     val watched = lib.watchedKeys(show.key)
+    if (last !in watched) return eps[idx]  // lancé moins de 15 s : on le relance depuis le début
     return (eps.drop(idx + 1) + eps.take(idx)).firstOrNull { it.key !in watched } ?: eps[idx]
 }
 

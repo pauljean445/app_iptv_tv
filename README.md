@@ -69,6 +69,12 @@ email et mot de passe du compte du foyer. La TV :
   du foyer, stocké **chiffré** dans le compte (AES-256-GCM : ni Google ni Firebase ne peuvent le lire) ;
 - si le compte n'a pas encore d'abonnement, le téléphone le demande (étape 2), puis il est partagé chiffré.
 
+Règle de l'abonnement partagé (identique sur PC) : le compte sert à **configurer les appareils qui n'en ont pas**
+(nouvelle TV, nouveau PC, profil sans abonnement). Un profil qui a déjà son abonnement sur l'appareil le **garde**
+(chaque appareil peut avoir le sien : le fournisseur donne par exemple un lien « TV » différent de celui du PC). Un
+changement d'abonnement fait sur un appareil met à jour la copie du compte (pour les futurs appareils) sans être
+imposé aux autres.
+
 Le mini-serveur de la TV n'existe que pendant cet écran, n'écoute que sur le réseau local, refuse toute requête sans
 le code aléatoire du QR (128 bits) et s'arrête dès que la connexion réussit. Réglages → « Changer d'abonnement IPTV »
 rouvre l'étape 2 seule.
@@ -83,6 +89,8 @@ au changement de profil et quand l'appli passe en arrière-plan. Serveur injoign
 - Onglets en haut ; à droite, le profil (☰) ouvre les réglages : profils (créer, modifier, réinitialiser, supprimer),
   catalogue, abonnement IPTV, compte, mise à jour.
 - Appui long sur une chaîne / un film / une série : favoris, « Vu récemment ». Sur l'accueil : retirer.
+- « Vu récemment » : un film / une série y entre dès que l'image démarre ; la position de reprise n'est gardée
+  qu'après 15 s (même règle que le PC). Série lancée moins de 15 s : relancée au même épisode, depuis le début.
 - Appui long sur une catégorie : la masquer (rangée dans « Autres », en bas de la liste) ou la réafficher.
 - Lecture : OK pause / lecture (en direct : différé, « Revenir au direct »), ← → ±10 s (replay ±1 min),
   ↑ ↓ chaîne précédente / suivante en direct ; commandes affichées : barre de temps (← → puis OK), langue et

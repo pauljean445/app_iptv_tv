@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -179,31 +180,41 @@ fun ChannelRow(item: Item, subtitle: String, fav: Boolean, onClick: () -> Unit, 
     }
 }
 
-/** Recherche dans tout le catalogue (sans tenir compte des accents). */
+/** Recherche dans les films et les séries (sans tenir compte des accents) : une bande de films et une bande de
+ *  séries, qui défilent vers la droite comme sur l'accueil ; comme la page Recherche de l'appli PC. */
 @Composable
 fun SearchContent(model: AppModel) {
     val catalog = model.catalog ?: return
     var query by rememberSaveable { mutableStateOf("") }
     var searched by remember { mutableStateOf(query) }
     LaunchedEffect(query) { delay(300); searched = query }  // pas de recherche à chaque lettre tapée
-    val results = remember(searched, catalog) {
-        val q = Item.normalize(searched.trim())
-        if (q.length < 2) emptyList()
-        else (catalog.byTab["live"].orEmpty() + catalog.byTab["movie"].orEmpty() + catalog.byTab["series"].orEmpty())
-            .filter { q in it.norm }.take(300)
+    val q = Item.normalize(searched.trim())
+    val (films, series) = remember(q, catalog) {
+        if (q.length < 2) emptyList<Item>() to emptyList()
+        else catalog.byTab["movie"].orEmpty().filter { q in it.norm }.take(300) to
+            catalog.byTab["series"].orEmpty().filter { q in it.norm }.take(300)
     }
-    Column(Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, top = 8.dp)) {
-        SearchField(query, { query = it }, Modifier.width(560.dp))
-        Text(if (query.trim().length < 2) "Tape au moins 2 lettres (le clavier du téléphone fonctionne aussi, via l'appli Google TV)."
-            else "${results.size} résultat(s)" + if (results.size == 300) " (300 premiers)" else "",
-            color = C.muted, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp))
-        LazyVerticalGrid(GridCells.Adaptive(150.dp), contentPadding = PaddingValues(bottom = 40.dp, start = 6.dp, end = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            items(results, key = { it.key }) { it ->
-                val kind = mapOf("live" to "Direct", "movie" to "Film", "series" to "Série")[it.kind] ?: ""
-                Tile(it, "$kind · ${it.groupLabel}", poster = it.kind != "live", modifier = Modifier.restoreFocus(model, it.key), onClick = {
-                    if (it.kind == "live") model.open(Screen.Player(it, listOf(it), resume = false)) else model.open(Screen.Details(it))
-                })
+    fun sub(it: Item) = listOf(it.year, if (it.rating.isNotEmpty()) "★ ${it.rating}" else "")
+        .filter { s -> s.isNotEmpty() }.joinToString(" · ").ifEmpty { it.groupLabel }
+    LazyColumn(contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 8.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        item {
+            Column {
+                SearchField(query, { query = it }, Modifier.width(640.dp))
+                Text(if (q.length < 2) "Tape au moins 2 lettres pour chercher un film ou une série (le clavier du " +
+                    "téléphone fonctionne aussi, via l'appli Google TV)."
+                    else "${films.size} film${if (films.size > 1) "s" else ""}, ${series.size} série${if (series.size > 1) "s" else ""}",
+                    color = C.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp))
+            }
+        }
+        if (q.length >= 2) {
+            item {
+                HomeRow("Films", "Résultats", films, poster = true, empty = "Aucun film trouvé.", subtitle = ::sub,
+                    progress = { -1f }, onClick = { model.open(Screen.Details(it)) }, onLongClick = { }, model = model)
+            }
+            item {
+                HomeRow("Séries", "Résultats", series, poster = true, empty = "Aucune série trouvée.", subtitle = ::sub,
+                    progress = { -1f }, onClick = { model.open(Screen.Details(it)) }, onLongClick = { }, model = model)
             }
         }
     }

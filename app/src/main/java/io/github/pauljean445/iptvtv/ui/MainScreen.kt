@@ -134,7 +134,7 @@ fun HomeContent(model: AppModel) {
         item {
             HomeRow("Films", "En cours de lecture", movies, poster = true,
                 empty = "Aucun film en cours. Les films commencés apparaîtront ici.",
-                subtitle = { m -> lib.position(m.key).let { if (it > 0) "Reprendre à ${fmtTime(it)}" else "À reprendre" } },
+                subtitle = { m -> lib.position(m.key).let { if (it > 0) "Reprendre à ${fmtTime(it)}" else "Commencé" } },
                 progress = { m -> lib.length(m.key).let { if (it > 0) lib.position(m.key).toFloat() / it else -1f } },
                 onClick = { model.open(Screen.Details(it)) }, model = model,
                 onLongClick = { removing = "movie" to it })
@@ -147,7 +147,12 @@ fun HomeContent(model: AppModel) {
                     val last = e?.get("last_ep").str()
                     val label = e?.get("last_label").str() ?: ""
                     val pos = lib.position(last)
-                    if (label.isEmpty()) "En cours" else if (pos > 0) "$label · reprendre à ${fmtTime(pos)}" else "Après $label"
+                    when {
+                        label.isEmpty() -> "En cours"
+                        pos > 0 -> "$label · reprendre à ${fmtTime(pos)}"
+                        last in lib.watchedKeys(s.key) -> "Après $label"
+                        else -> "$label · commencé"
+                    }
                 },
                 progress = { s ->
                     val last = lib.recent[s.key].asObj()?.get("last_ep").str()
@@ -180,8 +185,9 @@ fun HomeContent(model: AppModel) {
     }
 }
 
+/** Une bande de l'accueil (aussi utilisée par la recherche). */
 @Composable
-private fun HomeRow(title: String, sub: String, items: List<Item>, poster: Boolean, empty: String,
+internal fun HomeRow(title: String, sub: String, items: List<Item>, poster: Boolean, empty: String,
                     subtitle: (Item) -> String, progress: (Item) -> Float, onClick: (Item) -> Unit,
                     onLongClick: (Item) -> Unit, model: AppModel) {
     Column {
