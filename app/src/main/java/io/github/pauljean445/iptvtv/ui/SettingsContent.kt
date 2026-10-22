@@ -83,6 +83,8 @@ fun SettingsContent(model: AppModel) {
             Section("Profils", "Un profil par personne du foyer : chacun a ses favoris, ses lectures en cours et ses " +
                 "langues. Les profils sont partagés avec les autres appareils du foyer.") {
                 AppButton("Nouveau profil", { editing = null to null }, icon = Icons.Filled.PersonAdd)
+                if (model.profiles.size > 1) SwitchRow("Demander « Qui regarde ? » au démarrage", model.askProfile,
+                    { model.setAskProfile(!model.askProfile) })
             }
         }
         items(model.profiles, key = { it["id"].str() }) { p ->

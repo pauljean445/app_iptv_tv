@@ -36,7 +36,7 @@ fun ProfilesScreen(model: AppModel) {
             for (p in model.profiles) {
                 val id = p["id"].str()
                 FocusCard(
-                    onClick = { model.openProfile(id) },
+                    onClick = { model.chooseProfile(id) },
                     modifier = if (id == current) Modifier.focusRequester(focus) else Modifier,
                     color = C.bg, radius = 20.dp,
                 ) {
@@ -48,6 +48,9 @@ fun ProfilesScreen(model: AppModel) {
                 }
             }
         }
+        // Se souvenir du choix : au prochain démarrage, le profil choisi s'ouvre directement (modifiable dans Réglages)
+        SwitchRow("Ouvrir directement le profil choisi au prochain démarrage", !model.askProfile,
+            { model.setAskProfile(!model.askProfile) }, Modifier.padding(top = 44.dp))
     }
     LaunchedEffect(Unit) { try { focus.requestFocus() } catch (e: Exception) { } }
 }

@@ -150,3 +150,20 @@ fun fmtTime(ms: Long): String {
     val s = ms / 1000
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
+
+/** Interrupteur (comme sur le téléphone et le PC) dans une ligne sélectionnable à la télécommande : OK l'inverse.
+ *  Pastille qui glisse, piste violette quand il est activé. */
+@Composable
+fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val knob by androidx.compose.animation.core.animateDpAsState(if (checked) 26.dp else 0.dp, label = "pastille")
+    val track by androidx.compose.animation.animateColorAsState(if (checked) C.accent else C.surface2, label = "piste")
+    FocusCard(onClick = onToggle, modifier = modifier, color = C.surface, radius = 14.dp) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(width = 56.dp, height = 30.dp).background(track, RoundedCornerShape(15.dp))
+                .border(1.dp, if (checked) Color.Transparent else C.muted, RoundedCornerShape(15.dp)).padding(4.dp)) {
+                Box(Modifier.padding(start = knob).size(22.dp).background(if (checked) Color.White else C.text, CircleShape))
+            }
+            Text(label, color = C.text, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
+        }
+    }
+}
