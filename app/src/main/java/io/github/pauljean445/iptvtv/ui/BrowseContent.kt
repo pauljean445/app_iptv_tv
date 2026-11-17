@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -87,12 +88,14 @@ fun BrowseContent(model: AppModel, tab: String) {
         else -> model.open(Screen.Details(it))
     }
 
+    val groupFocus = rememberSelectedFocus()
     Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 24.dp, top = 8.dp)) {
-        LazyColumn(Modifier.width(300.dp).fillMaxHeight(), contentPadding = PaddingValues(bottom = 40.dp),
+        LazyColumn(Modifier.width(300.dp).fillMaxHeight().enterOnSelected(groupFocus), contentPadding = PaddingValues(bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items(groups, key = { it.first }) { (key, label) ->
                 GroupItem(label, key == group, onClick = { group = key },
-                    onLongClick = if (key != FAV && key != RECENT && key != ALL) ({ groupActions = key }) else null)
+                    onLongClick = if (key != FAV && key != RECENT && key != ALL) ({ groupActions = key }) else null,
+                    modifier = Modifier.selectedTarget(groupFocus, key == group))
             }
             if (hiddenGroups.isNotEmpty()) {
                 item(key = "\u0000others") {
@@ -100,7 +103,8 @@ fun BrowseContent(model: AppModel, tab: String) {
                         onClick = { othersOpen = !othersOpen })
                 }
                 if (othersOpen) items(hiddenGroups, key = { "\u0000h:$it" }) { g ->
-                    GroupItem("     $g", g == group, muted = true, onClick = { group = g }, onLongClick = { groupActions = g })
+                    GroupItem("     $g", g == group, muted = true, onClick = { group = g }, onLongClick = { groupActions = g },
+                        modifier = Modifier.selectedTarget(groupFocus, g == group))
                 }
             }
         }
@@ -115,7 +119,7 @@ fun BrowseContent(model: AppModel, tab: String) {
                         RECENT -> "Rien en cours pour le moment."
                         else -> "Aucune entrée dans cette catégorie."
                     }, color = C.muted, fontSize = 16.sp, modifier = Modifier.padding(top = 20.dp))
-            } else if (tab == "live" || tab == "replay") {
+            } else if (tab == "live" || tab == "replay") key(tab, group) {  // autre catégorie : liste repartie du haut
                 LazyColumn(contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(items, key = { it.key }) { it ->
                         ChannelRow(it, if (tab == "replay") "${it.groupLabel} · replay ${it.archiveDays} j" else it.groupLabel,
@@ -123,14 +127,13 @@ fun BrowseContent(model: AppModel, tab: String) {
                             modifier = Modifier.restoreFocus(model, it.key))
                     }
                 }
-            } else {
+            } else key(tab, group) {  // autre catégorie : mosaïque repartie du haut
                 LazyVerticalGrid(GridCells.Adaptive(150.dp), contentPadding = PaddingValues(bottom = 40.dp, top = 6.dp, start = 6.dp, end = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     items(items, key = { it.key }) { it ->
                         val pos = if (tab == "movie") lib.resumePosition(it.key) else 0L
                         val len = if (tab == "movie") lib.length(it.key) else 0L
-                        val sub = listOf(ImdbBase.yearOf(it), ImdbBase.shortRating(it), if (it.kind == "movie") ImdbBase.runtimeText(it) else "")
-                            .filter { s -> s.isNotEmpty() }.joinToString(" · ")
+                        val sub = ImdbBase.tileText(it)
                         Tile(it, sub, poster = true, progress = if (pos > 0 && len > 0) pos.toFloat() / len else -1f,
                             onClick = { open(it) }, onLongClick = { actionsFor = it }, modifier = Modifier.restoreFocus(model, it.key))
                     }
@@ -195,7 +198,7 @@ fun SearchContent(model: AppModel) {
         else catalog.byTab["movie"].orEmpty().filter { q in it.norm }.take(300) to
             catalog.byTab["series"].orEmpty().filter { q in it.norm }.take(300)
     }
-    fun sub(it: Item) = listOf(ImdbBase.yearOf(it), ImdbBase.shortRating(it), if (it.kind == "movie") ImdbBase.runtimeText(it) else "")
+    fun sub(it: Item) = listOf(ImdbBase.tileText(it))
         .filter { s -> s.isNotEmpty() }.joinToString(" · ").ifEmpty { it.groupLabel }
     LazyColumn(contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 8.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -224,7 +227,7 @@ fun SearchContent(model: AppModel) {
 /** Une ligne de la liste des catégories (appui long : masquer / réafficher). */
 @Composable
 private fun GroupItem(label: String, selected: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)? = null,
-                      muted: Boolean = false) {
+                      muted: Boolean = false, modifier: Modifier = Modifier) {
     ListItem(
         selected = selected, onClick = onClick, onLongClick = onLongClick,
         headlineContent = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = if (muted) 14.sp else 15.sp) },
@@ -232,6 +235,6 @@ private fun GroupItem(label: String, selected: Boolean, onClick: () -> Unit, onL
             contentColor = if (muted) C.muted.copy(alpha = 0.7f) else C.muted,
             selectedContainerColor = C.surface2, selectedContentColor = C.text,
             focusedContainerColor = C.accent, focusedContentColor = androidx.compose.ui.graphics.Color.White),
-        modifier = Modifier.height(44.dp),
+        modifier = modifier.height(44.dp),
     )
 }

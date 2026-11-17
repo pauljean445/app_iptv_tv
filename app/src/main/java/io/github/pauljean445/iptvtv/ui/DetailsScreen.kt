@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -159,9 +160,10 @@ fun DetailsScreen(model: AppModel, item: Item) {
             if (item.kind == "series" && eps.isNotEmpty()) {
                 item {
                     watch()  // relit l'état ici (voir watch)
-                    LazyRow(Modifier.padding(top = 18.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    val seasonFocus = rememberSelectedFocus()
+                    LazyRow(Modifier.padding(top = 18.dp, bottom = 4.dp).enterOnSelected(seasonFocus), horizontalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
-                        items(seasons) { s -> AppButton("Saison $s", { season = s }, primary = s == season) }
+                        items(seasons) { s -> AppButton("Saison $s", { season = s }, Modifier.selectedTarget(seasonFocus, s == season), primary = s == season) }
                     }
                 }
                 items(eps.filter { it.season == season }, key = { it.key }) { ep ->
@@ -249,10 +251,11 @@ fun ProgramsScreen(model: AppModel, channel: Item) {
             else -> {
                 val days = list.map { it.group }.distinct()
                 var day by remember { mutableStateOf(days.first()) }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(4.dp)) {
-                    items(days) { d -> AppButton(d, { day = d }, primary = d == day) }
+                val dayFocus = rememberSelectedFocus()
+                LazyRow(Modifier.enterOnSelected(dayFocus), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(4.dp)) {
+                    items(days) { d -> AppButton(d, { day = d }, Modifier.selectedTarget(dayFocus, d == day), primary = d == day) }
                 }
-                LazyColumn(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                key(day) { LazyColumn(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 40.dp, top = 4.dp, start = 4.dp, end = 4.dp)) {
                     val shown = list.filter { it.group == day }
                     val now = System.currentTimeMillis() / 1000
@@ -278,7 +281,7 @@ fun ProgramsScreen(model: AppModel, channel: Item) {
                             }
                         }
                     }
-                }
+                } }
             }
         }
     }

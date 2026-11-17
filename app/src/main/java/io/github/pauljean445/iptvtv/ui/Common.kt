@@ -13,6 +13,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
@@ -166,4 +170,43 @@ fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit, modifier: M
             Text(label, color = C.text, fontSize = 16.sp, modifier = Modifier.padding(start = 16.dp))
         }
     }
+}
+
+
+/**
+ * Groupe de choix (catégories, saisons, jours des replays) : en y revenant avec la télécommande, le focus va sur
+ * l'élément choisi, pas sur le plus proche à l'écran (qui tombait « au hasard » après avoir défilé dans la liste).
+ */
+class SelectedFocus {
+    val requester = FocusRequester()
+    var attached by mutableStateOf(false)
+    internal var inside = false  // le focus est déjà dans le groupe (on s'y déplace : ne pas le renvoyer)
+}
+
+@Composable
+fun rememberSelectedFocus() = remember { SelectedFocus() }
+
+/** Sur le conteneur du groupe (colonne ou rangée) : groupe de focus dont l'entrée va sur l'élément choisi. */
+@OptIn(ExperimentalComposeUiApi::class)
+fun Modifier.enterOnSelected(sf: SelectedFocus): Modifier =
+    focusProperties { enter = { if (sf.attached) sf.requester else FocusRequester.Default } }
+        .onFocusChanged { st ->
+            // Arrivée depuis l'extérieur (la recherche de focus d'Android a pris l'élément le plus proche) :
+            // renvoi sur l'élément choisi. Déplacements à l'intérieur du groupe : rien.
+            if (st.hasFocus && !sf.inside) {
+                sf.inside = true
+                if (sf.attached) try { sf.requester.requestFocus() } catch (e: Exception) { }
+            } else if (!st.hasFocus) sf.inside = false
+        }
+        .focusGroup()
+
+/** Sur chaque élément du groupe : celui qui est choisi devient la cible. */
+@Composable
+fun Modifier.selectedTarget(sf: SelectedFocus, selected: Boolean): Modifier {
+    if (!selected) return this
+    DisposableEffect(sf) {
+        sf.attached = true
+        onDispose { sf.attached = false }
+    }
+    return this.focusRequester(sf.requester)
 }
