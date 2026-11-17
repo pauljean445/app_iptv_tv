@@ -181,6 +181,8 @@ class SelectedFocus {
     val requester = FocusRequester()
     var attached by mutableStateOf(false)
     internal var inside = false  // le focus est déjà dans le groupe (on s'y déplace : ne pas le renvoyer)
+    /** Élément choisi sorti de l'écran (liste qui a défilé) : le faire revenir à l'écran puis lui donner le focus. */
+    var bringBack: (() -> Unit)? = null
 }
 
 @Composable
@@ -196,6 +198,7 @@ fun Modifier.enterOnSelected(sf: SelectedFocus): Modifier =
             if (st.hasFocus && !sf.inside) {
                 sf.inside = true
                 if (sf.attached) try { sf.requester.requestFocus() } catch (e: Exception) { }
+                else sf.bringBack?.invoke()
             } else if (!st.hasFocus) sf.inside = false
         }
         .focusGroup()

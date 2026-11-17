@@ -42,6 +42,7 @@ import io.github.pauljean445.iptvtv.AppModel
 import io.github.pauljean445.iptvtv.Screen
 import io.github.pauljean445.iptvtv.data.Item
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 const val FAV = "\u0000fav"
 const val RECENT = "\u0000recent"
@@ -89,8 +90,21 @@ fun BrowseContent(model: AppModel, tab: String) {
     }
 
     val groupFocus = rememberSelectedFocus()
+    val groupState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val groupScope = androidx.compose.runtime.rememberCoroutineScope()
+    // Catégorie ouverte sortie de l'écran : on y fait défiler la colonne, puis on lui donne le focus
+    groupFocus.bringBack = {
+        val i = groups.indexOfFirst { it.first == group }.takeIf { it >= 0 }
+            ?: hiddenGroups.indexOf(group).takeIf { it >= 0 && othersOpen }?.let { groups.size + 1 + it }
+        if (i != null) groupScope.launch {
+            groupState.scrollToItem(i)
+            androidx.compose.runtime.withFrameNanos { }
+            try { groupFocus.requester.requestFocus() } catch (e: Exception) { }
+        }
+    }
     Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 24.dp, top = 8.dp)) {
-        LazyColumn(Modifier.width(300.dp).fillMaxHeight().enterOnSelected(groupFocus), contentPadding = PaddingValues(bottom = 40.dp),
+        LazyColumn(Modifier.width(300.dp).fillMaxHeight().enterOnSelected(groupFocus), state = groupState,
+            contentPadding = PaddingValues(bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items(groups, key = { it.first }) { (key, label) ->
                 GroupItem(label, key == group, onClick = { group = key },
