@@ -17,6 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
+import io.github.pauljean445.iptvtv.data.ImdbBase
 import io.github.pauljean445.iptvtv.AppModel
 import io.github.pauljean445.iptvtv.Screen
 import io.github.pauljean445.iptvtv.data.Item
@@ -48,7 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Fiche d'un film ou d'une série (saisons et épisodes). */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DetailsScreen(model: AppModel, item: Item) {
     val lib = model.library
@@ -67,7 +75,23 @@ fun DetailsScreen(model: AppModel, item: Item) {
         }
         loaded++
     }
-    @Suppress("UNUSED_VARIABLE") val reload = loaded  // relu : la fiche se redessine à l'arrivée des détails
+    // Lu DANS chaque élément de la liste : sinon Compose réutilise l'élément tel quel (mêmes paramètres capturés),
+    // et ni le favori ni le descriptif arrivé après coup ne s'affichent.
+    fun watch() = loaded + model.libVersion
+    @Suppress("UNUSED_VARIABLE") val reload = loaded  // ici aussi : la liste des épisodes arrivée ensuite est ajoutée
+    val listState = rememberLazyListState()
+    // Focus sur Lire / Favori (en remontant depuis les épisodes) : le défilement d'Android vers le bouton va
+    // directement tout en haut (titre et résumé visibles), en une seule animation
+    val top = remember { object { var buttonsFocused = false; var headerPx = 0 } }
+    val density = LocalDensity.current
+    val defaultSpec = LocalBringIntoViewSpec.current
+    val spec = remember(defaultSpec, density) {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                if (top.buttonsFocused) offset - (top.headerPx + with(density) { (8 + 14).dp.toPx() })
+                else defaultSpec.calculateScrollDistance(offset, size, containerSize)
+        }
+    }
     val focus = remember { FocusRequester() }
     var actionsFor by remember { mutableStateOf<Item?>(null) }
     val tab = if (item.kind == "series") "series" else "movie"
@@ -80,16 +104,18 @@ fun DetailsScreen(model: AppModel, item: Item) {
     Row(Modifier.fillMaxSize().background(C.bg).padding(start = 56.dp, top = 40.dp, end = 40.dp)) {
         Box(Modifier.width(260.dp).height(390.dp).clip(RoundedCornerShape(14.dp))) { ItemImage(item, Modifier.fillMaxSize()) }
         // Colonne de droite entièrement défilable : fiche, boutons, langues, saisons puis épisodes
-        LazyColumn(Modifier.weight(1f).padding(start = 40.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+        CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
+        LazyColumn(Modifier.weight(1f).padding(start = 40.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(start = 4.dp, end = 8.dp, bottom = 48.dp)) {
             item {
-                Column {
+                watch()  // relit l'état ici (voir watch)
+                Column(Modifier.onSizeChanged { top.headerPx = it.height }) {
                     Text(item.name, color = C.text, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 2,
                         overflow = TextOverflow.Ellipsis)
-                    val meta = listOf(item.year, if (item.rating.isNotEmpty()) "★ ${item.rating}" else "", item.genre, item.duration)
+                    val meta = listOf(ImdbBase.yearOf(item), ImdbBase.ratingText(item), item.genre, ImdbBase.runtimeText(item))
                         .filter { it.isNotEmpty() }.joinToString("  ·  ")
                     if (meta.isNotEmpty()) Text(meta, color = C.muted, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-                    Text(item.plot.ifEmpty { if (error.isNotEmpty()) error else "" }, color = C.text, fontSize = 16.sp, maxLines = 5,
+                    Text(item.plot.ifEmpty { error }.ifEmpty { if (loaded == 0) "Chargement du descriptif…" else "" }, color = C.text, fontSize = 16.sp, maxLines = 5,
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 16.dp))
                     if (item.director.isNotEmpty() || item.cast.isNotEmpty()) Text(
                         listOf(if (item.director.isNotEmpty()) "Réalisation : ${item.director}" else "",
@@ -99,7 +125,9 @@ fun DetailsScreen(model: AppModel, item: Item) {
                 }
             }
             item {
-                Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                watch()  // relit l'état ici (voir watch)
+                Row(Modifier.padding(top = 14.dp).onFocusChanged { f -> top.buttonsFocused = f.hasFocus },
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (item.kind == "movie") {
                         val pos = lib.resumePosition(item.key)
                         AppButton(if (pos > 0) "Reprendre à ${fmtTime(pos)}" else "Lire",
@@ -124,11 +152,13 @@ fun DetailsScreen(model: AppModel, item: Item) {
                 }
             }
             item {
+                watch()  // relit l'état ici (voir watch)
                 val langTarget = if (item.kind == "movie") item else seriesTarget(model, item)
                 if (langTarget != null && langTarget.url.isNotEmpty()) LanguageChoice(model, item, langTarget)
             }
             if (item.kind == "series" && eps.isNotEmpty()) {
                 item {
+                    watch()  // relit l'état ici (voir watch)
                     LazyRow(Modifier.padding(top = 18.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
                         items(seasons) { s -> AppButton("Saison $s", { season = s }, primary = s == season) }
@@ -139,6 +169,7 @@ fun DetailsScreen(model: AppModel, item: Item) {
                         onLongClick = { actionsFor = ep }, modifier = Modifier.restoreFocus(model, ep.key))
                 }
             }
+        }
         }
     }
     LaunchedEffect(Unit) { try { focus.requestFocus() } catch (e: Exception) { } }
@@ -224,14 +255,26 @@ fun ProgramsScreen(model: AppModel, channel: Item) {
                 LazyColumn(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 40.dp, top = 4.dp, start = 4.dp, end = 4.dp)) {
                     val shown = list.filter { it.group == day }
+                    val now = System.currentTimeMillis() / 1000
                     items(shown, key = { it.key }) { p ->
+                        // Comme sur PC : heure de début en grand, fin, titre, durée / en cours, 2 lignes de résumé
                         FocusCard(onClick = { model.open(Screen.Player(p, list, resume = false)) },
-                            modifier = Modifier.fillMaxWidth().height(64.dp), radius = 10.dp) {
-                            Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
-                                Text(p.name, color = C.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis)
-                                if (p.plot.isNotEmpty()) Text(p.plot, color = C.muted, fontSize = 13.sp, maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis)
+                            modifier = Modifier.fillMaxWidth(), radius = 10.dp) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+                                Column(Modifier.width(96.dp)) {
+                                    Text(hhmm(p.start), color = C.accentHi, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                    Text(hhmm(p.end), color = C.muted, fontSize = 14.sp)
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(programTitle(p), color = C.text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Row {
+                                        Text(p.duration, color = C.muted, fontSize = 14.sp)
+                                        if (p.end > now) Text("  ·  ● en cours", color = C.live, fontSize = 14.sp)
+                                    }
+                                    if (p.plot.isNotEmpty()) Text(p.plot, color = C.muted, fontSize = 14.sp, maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                                }
                             }
                         }
                     }
@@ -240,6 +283,12 @@ fun ProgramsScreen(model: AppModel, channel: Item) {
         }
     }
 }
+
+/** Heure « 14:05 » d'un horodatage en secondes. */
+private fun hhmm(sec: Long): String = java.text.SimpleDateFormat("HH:mm", java.util.Locale.FRANCE).format(java.util.Date(sec * 1000))
+
+/** Titre seul d'un programme (son nom commence par l'horaire et peut finir par « (en cours) »). */
+private fun programTitle(p: Item): String = p.name.substringAfter("  ", p.name).removeSuffix("  (en cours)").trim()
 
 /**
  * Langue et sous-titres, choisis sur la fiche (pistes lues dans le fichier, comme sur PC). Le choix est mémorisé

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
+import io.github.pauljean445.iptvtv.data.ImdbBase
 import io.github.pauljean445.iptvtv.AppModel
 import io.github.pauljean445.iptvtv.Screen
 import io.github.pauljean445.iptvtv.data.Item
@@ -128,7 +129,7 @@ fun BrowseContent(model: AppModel, tab: String) {
                     items(items, key = { it.key }) { it ->
                         val pos = if (tab == "movie") lib.resumePosition(it.key) else 0L
                         val len = if (tab == "movie") lib.length(it.key) else 0L
-                        val sub = listOf(it.year, if (it.rating.isNotEmpty()) "★ ${it.rating}" else "")
+                        val sub = listOf(ImdbBase.yearOf(it), ImdbBase.shortRating(it), if (it.kind == "movie") ImdbBase.runtimeText(it) else "")
                             .filter { s -> s.isNotEmpty() }.joinToString(" · ")
                         Tile(it, sub, poster = true, progress = if (pos > 0 && len > 0) pos.toFloat() / len else -1f,
                             onClick = { open(it) }, onLongClick = { actionsFor = it }, modifier = Modifier.restoreFocus(model, it.key))
@@ -194,7 +195,7 @@ fun SearchContent(model: AppModel) {
         else catalog.byTab["movie"].orEmpty().filter { q in it.norm }.take(300) to
             catalog.byTab["series"].orEmpty().filter { q in it.norm }.take(300)
     }
-    fun sub(it: Item) = listOf(it.year, if (it.rating.isNotEmpty()) "★ ${it.rating}" else "")
+    fun sub(it: Item) = listOf(ImdbBase.yearOf(it), ImdbBase.shortRating(it), if (it.kind == "movie") ImdbBase.runtimeText(it) else "")
         .filter { s -> s.isNotEmpty() }.joinToString(" · ").ifEmpty { it.groupLabel }
     LazyColumn(contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 8.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp)) {
