@@ -1,5 +1,8 @@
 package io.github.pauljean445.iptvtv.ui
 
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,10 +50,21 @@ import io.github.pauljean445.iptvtv.data.str
 @Composable
 fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     BasicTextField(
         value = value, onValueChange = onChange, singleLine = true,
         textStyle = TextStyle(color = C.text, fontSize = 18.sp), cursorBrush = SolidColor(C.accentHi),
-        modifier = modifier.onFocusChanged { focused = it.isFocused }
+        // Champ d'une ligne : haut / bas de la télécommande sortent du champ (il les gardait pour le curseur)
+        modifier = modifier.onPreviewKeyEvent { e ->
+            if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (e.key) {
+                androidx.compose.ui.input.key.Key.DirectionDown ->
+                    focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
+                androidx.compose.ui.input.key.Key.DirectionUp ->
+                    focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Up)
+                else -> false
+            }
+        }.onFocusChanged { focused = it.isFocused }
             .background(C.panel, RoundedCornerShape(10.dp))
             .border(if (focused) 2.dp else 1.dp, if (focused) C.accent else C.line, RoundedCornerShape(10.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp),

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,10 +48,20 @@ fun ItemImage(item: Item, modifier: Modifier = Modifier, crop: Boolean = true, p
     }
 }
 
-/** Vignette : image (affiche si poster, sinon logo), barre de progression, titre et sous-titre. */
+/** Petite coche mauve en haut à droite d'une image : film / série / épisode vu. */
+@Composable
+fun SeenBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    Box(modifier.padding(6.dp).size(size).background(C.accent, androidx.compose.foundation.shape.CircleShape),
+        contentAlignment = Alignment.Center) {
+        androidx.tv.material3.Icon(androidx.compose.material.icons.Icons.Filled.Check, contentDescription = "Vu",
+            tint = Color.White, modifier = Modifier.size(size * 0.68f))
+    }
+}
+
+/** Vignette : image (affiche si poster, sinon logo), barre de progression, coche « vu », titre et sous-titre. */
 @Composable
 fun Tile(item: Item, subtitle: String, poster: Boolean, progress: Float = -1f, onClick: () -> Unit,
-         onLongClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+         onLongClick: (() -> Unit)? = null, modifier: Modifier = Modifier, seen: Boolean = false) {
     val w = if (poster) 150.dp else 190.dp
     val h = if (poster) 225.dp else 118.dp
     Column(Modifier.width(w)) {
@@ -57,6 +69,7 @@ fun Tile(item: Item, subtitle: String, poster: Boolean, progress: Float = -1f, o
             Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))) {
                 ItemImage(item, Modifier.fillMaxSize(), crop = poster, padding = if (poster) 0.dp else 14.dp)
                 if (progress >= 0f) ProgressBar(progress, Modifier.align(Alignment.BottomCenter))
+                if (seen) SeenBadge(Modifier.align(Alignment.TopEnd))
             }
         }
         Text(item.name, color = C.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,

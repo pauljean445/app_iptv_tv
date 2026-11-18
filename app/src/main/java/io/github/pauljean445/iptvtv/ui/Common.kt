@@ -179,10 +179,15 @@ fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit, modifier: M
  */
 class SelectedFocus {
     val requester = FocusRequester()
-    var attached by mutableStateOf(false)
+    /** Nombre d'éléments marqués « choisi » présents (compteur et non booléen : quand la cible passe d'un élément à
+     *  l'autre, le nouveau peut s'inscrire avant que l'ancien se retire, ce qui remettait un booléen à faux). */
+    internal var targets by mutableStateOf(0)
+    val attached get() = targets > 0
     internal var inside = false  // le focus est déjà dans le groupe (on s'y déplace : ne pas le renvoyer)
     /** Élément choisi sorti de l'écran (liste qui a défilé) : le faire revenir à l'écran puis lui donner le focus. */
     var bringBack: (() -> Unit)? = null
+    /** Le focus quitte le groupe : remettre l'élément choisi à l'écran (le retour tombera dessus). */
+    var onLeave: (() -> Unit)? = null
 }
 
 @Composable
@@ -199,7 +204,10 @@ fun Modifier.enterOnSelected(sf: SelectedFocus): Modifier =
                 sf.inside = true
                 if (sf.attached) try { sf.requester.requestFocus() } catch (e: Exception) { }
                 else sf.bringBack?.invoke()
-            } else if (!st.hasFocus) sf.inside = false
+            } else if (!st.hasFocus && sf.inside) {
+                sf.inside = false
+                sf.onLeave?.invoke()
+            }
         }
         .focusGroup()
 
@@ -208,8 +216,8 @@ fun Modifier.enterOnSelected(sf: SelectedFocus): Modifier =
 fun Modifier.selectedTarget(sf: SelectedFocus, selected: Boolean): Modifier {
     if (!selected) return this
     DisposableEffect(sf) {
-        sf.attached = true
-        onDispose { sf.attached = false }
+        sf.targets++
+        onDispose { sf.targets-- }
     }
     return this.focusRequester(sf.requester)
 }

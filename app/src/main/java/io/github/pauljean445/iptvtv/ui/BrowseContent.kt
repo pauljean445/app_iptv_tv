@@ -54,7 +54,13 @@ fun BrowseContent(model: AppModel, tab: String) {
     val catalog = model.catalog ?: return
     val lib = model.library
     @Suppress("UNUSED_VARIABLE") val v = model.libVersion
-    var group by rememberSaveable(tab) { mutableStateOf(if (lib.favoriteKeys(tab).isNotEmpty()) FAV else ALL) }
+    // « Tout voir » de l'accueil : catégorie demandée (★ Favoris / ◷ Vu récemment)
+    val asked = model.pendingGroup?.takeIf { it.first == tab }?.second
+    var group by rememberSaveable(tab) { mutableStateOf(asked ?: ALL) }
+    if (asked != null) {
+        model.pendingGroup = null
+        group = asked
+    }
     var actionsFor by remember { mutableStateOf<Item?>(null) }
     var groupActions by remember { mutableStateOf<String?>(null) }  // catégorie : masquer / réafficher
     var othersOpen by rememberSaveable(tab) { mutableStateOf(false) }
@@ -73,15 +79,16 @@ fun BrowseContent(model: AppModel, tab: String) {
             else -> all.filter { it.groupLabel == group }
         }
     }
+    // ★ Favoris : plus dans la liste (onglet Favoris), en tête d'« Autres » avec les catégories masquées
+    val others = remember(hiddenGroups) { listOf(FAV) + hiddenGroups }
     val groups = remember(catalog, tab, hiddenGroups) {
         buildList {
-            add(FAV to "★  Favoris")
             if (tab == "movie" || tab == "series") add(RECENT to "◷  Vu récemment")
             add(ALL to "Toutes les catégories")
             catalog.groups[tab].orEmpty().filter { it !in hiddenGroups }.forEach { add(it to it) }
         }
     }
-    val title = groups.firstOrNull { it.first == group }?.second ?: group
+    val title = groups.firstOrNull { it.first == group }?.second ?: if (group == FAV) "★  Favoris" else group
 
     fun open(it: Item) = when (tab) {
         "live" -> model.open(Screen.Player(it, items, resume = false))
@@ -93,13 +100,38 @@ fun BrowseContent(model: AppModel, tab: String) {
     val groupState = androidx.compose.foundation.lazy.rememberLazyListState()
     val groupScope = androidx.compose.runtime.rememberCoroutineScope()
     // Catégorie ouverte sortie de l'écran : on y fait défiler la colonne, puis on lui donne le focus
+    fun selectedIndex(): Int? = groups.indexOfFirst { it.first == group }.takeIf { it >= 0 }
+        ?: others.indexOf(group).takeIf { it >= 0 && othersOpen }?.let { groups.size + 1 + it }
+    // En quittant la colonne (vers la mosaïque) : la catégorie ouverte revient à l'écran, le retour tombe dessus
+    groupFocus.onLeave = {
+        val i = selectedIndex()
+        if (i != null && groupState.layoutInfo.visibleItemsInfo.none { it.index == i }) groupScope.launch {
+            groupState.animateScrollToItem(maxOf(0, i - 2))
+        }
+    }
+    // Secours : au retour, elle n'est pas à l'écran -> on y va, on attend qu'elle soit affichée, puis focus
     groupFocus.bringBack = {
-        val i = groups.indexOfFirst { it.first == group }.takeIf { it >= 0 }
-            ?: hiddenGroups.indexOf(group).takeIf { it >= 0 && othersOpen }?.let { groups.size + 1 + it }
+        val i = selectedIndex()
         if (i != null) groupScope.launch {
-            groupState.scrollToItem(i)
+            groupState.scrollToItem(maxOf(0, i - 2))
+            repeat(20) {
+                androidx.compose.runtime.withFrameNanos { }
+                if (groupFocus.attached) {
+                    try { groupFocus.requester.requestFocus() } catch (e: Exception) { }
+                    return@launch
+                }
+            }
+        }
+    }
+    // Arrivée par « Tout voir » : la vignette qui avait le focus a disparu -> focus sur la catégorie ouverte
+    LaunchedEffect(Unit) {
+        if (asked == null) return@LaunchedEffect
+        repeat(20) {
             androidx.compose.runtime.withFrameNanos { }
-            try { groupFocus.requester.requestFocus() } catch (e: Exception) { }
+            if (groupFocus.attached) {
+                try { groupFocus.requester.requestFocus() } catch (e: Exception) { }
+                return@LaunchedEffect
+            }
         }
     }
     Row(Modifier.fillMaxSize().padding(start = 40.dp, end = 24.dp, top = 8.dp)) {
@@ -111,15 +143,14 @@ fun BrowseContent(model: AppModel, tab: String) {
                     onLongClick = if (key != FAV && key != RECENT && key != ALL) ({ groupActions = key }) else null,
                     modifier = Modifier.selectedTarget(groupFocus, key == group))
             }
-            if (hiddenGroups.isNotEmpty()) {
-                item(key = "\u0000others") {
-                    GroupItem((if (othersOpen) "▾  " else "▸  ") + "Autres · ${hiddenGroups.size}", false,
-                        onClick = { othersOpen = !othersOpen })
-                }
-                if (othersOpen) items(hiddenGroups, key = { "\u0000h:$it" }) { g ->
-                    GroupItem("     $g", g == group, muted = true, onClick = { group = g }, onLongClick = { groupActions = g },
-                        modifier = Modifier.selectedTarget(groupFocus, g == group))
-                }
+            item(key = "\u0000others") {
+                GroupItem((if (othersOpen) "▾  " else "▸  ") + "Autres · ${others.size}", false,
+                    onClick = { othersOpen = !othersOpen })
+            }
+            if (othersOpen) items(others, key = { "\u0000h:$it" }) { g ->
+                GroupItem("     " + if (g == FAV) "★  Favoris" else g, g == group, muted = true, onClick = { group = g },
+                    onLongClick = if (g == FAV) null else ({ groupActions = g }),
+                    modifier = Modifier.selectedTarget(groupFocus, g == group))
             }
         }
         Column(Modifier.weight(1f).padding(start = 24.dp)) {
@@ -149,7 +180,8 @@ fun BrowseContent(model: AppModel, tab: String) {
                         val len = if (tab == "movie") lib.length(it.key) else 0L
                         val sub = ImdbBase.tileText(it)
                         Tile(it, sub, poster = true, progress = if (pos > 0 && len > 0) pos.toFloat() / len else -1f,
-                            onClick = { open(it) }, onLongClick = { actionsFor = it }, modifier = Modifier.restoreFocus(model, it.key))
+                            onClick = { open(it) }, onLongClick = { actionsFor = it }, modifier = Modifier.restoreFocus(model, it.key),
+                            seen = lib.isDone(it.key))
                     }
                 }
             }

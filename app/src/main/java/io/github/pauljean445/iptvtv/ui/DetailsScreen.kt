@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -150,6 +152,10 @@ fun DetailsScreen(model: AppModel, item: Item) {
                     val fav = lib.isFavorite(tab, item.key)
                     AppButton(if (fav) "Retirer des favoris" else "Ajouter aux favoris", { model.toggleFavorite(tab, item) },
                         icon = if (fav) Icons.Filled.Star else Icons.Filled.StarBorder)
+                    // « Déjà vu » : film / série vus ailleurs (ou hors ligne) -> dans « Vu récemment », hors de « En cours »
+                    val done = lib.isDone(item.key)
+                    if (item.kind == "movie" || eps.isNotEmpty()) AppButton(if (done) "Retirer des vus" else "Déjà vu",
+                        { model.setDone(item, !done) }, icon = if (done) Icons.Filled.CheckCircle else Icons.Filled.Check)
                 }
             }
             item {
@@ -198,17 +204,14 @@ private fun EpisodeRow(model: AppModel, ep: Item, onClick: () -> Unit, onLongCli
             Box(Modifier.size(width = 112.dp, height = 63.dp).clip(RoundedCornerShape(6.dp))) {
                 ItemImage(ep, Modifier.fillMaxSize())
                 if (pos > 0 && len > 0) ProgressBar(pos.toFloat() / len, Modifier.align(Alignment.BottomCenter))
+                if (lib.isWatched(ep)) SeenBadge(Modifier.align(Alignment.TopEnd), size = 22.dp)
             }
             Column(Modifier.weight(1f).padding(start = 16.dp)) {
                 Text("${ep.episodeCode} · ${ep.name}", color = C.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(ep.plot.ifEmpty { ep.duration }, color = C.muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(when {
-                lib.isWatched(ep) -> "✓ Vu"
-                pos > 0 -> "En cours · ${fmtTime(pos)}"
-                else -> ""
-            }, color = C.accentHi, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
+            Text(if (pos > 0) "En cours · ${fmtTime(pos)}" else "", color = C.accentHi, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
         }
     }
 }
@@ -225,7 +228,8 @@ fun seriesTarget(model: AppModel, show: Item): Item? {
     if (lib.resumePosition(last) > 0) return eps[idx]
     val watched = lib.watchedKeys(show.key)
     if (last !in watched) return eps[idx]  // lancé moins de 15 s : on le relance depuis le début
-    return (eps.drop(idx + 1) + eps.take(idx)).firstOrNull { it.key !in watched } ?: eps[idx]
+    // Tout vu : on repart du début
+    return (eps.drop(idx + 1) + eps.take(idx)).firstOrNull { it.key !in watched } ?: eps.first()
 }
 
 /** Replays d'une chaîne : programmes passés, du plus récent au plus ancien, filtrés par jour. */

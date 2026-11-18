@@ -125,6 +125,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var toast by mutableStateOf("")
     /** Entrée à resélectionner au retour dans une liste (après une lecture, une fiche…). */
     var focusKey: String? = null
+    /** Bande de l'accueil d'où la fiche / lecture a été ouverte (le retour remet le focus dans celle-là). */
+    var homeRow: String? = null
+    /** « Tout voir » de l'accueil : onglet et catégorie (★ Favoris / ◷ Vu récemment) à ouvrir. */
+    var pendingGroup: Pair<String, String>? = null
     private var catalogJob: Job? = null
 
     // ---- Mise à jour de l'appli (releases GitHub) ----------------------------------------- //
@@ -413,6 +417,13 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     fun removeRecent(item: Item) {
         library.removeRecent(item.key, item.episodes.orEmpty().map { it.key })
+        libraryChanged()
+    }
+
+    /** Bouton « Déjà vu » de la fiche : film (ou toute la série) marqué vu, dans « Vu récemment » ; done = false :
+     *  « Marquer comme non vu » (retiré de « Vu récemment », épisodes vus oubliés). */
+    fun setDone(item: Item, done: Boolean) {
+        if (done) library.markDone(item) else library.removeRecent(item.key, item.episodes.orEmpty().map { it.key })
         libraryChanged()
     }
 
